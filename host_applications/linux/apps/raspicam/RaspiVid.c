@@ -225,6 +225,7 @@ struct RASPIVID_STATE_S
    bool netListen;
    MMAL_BOOL_T addSPSTiming;
    int slices;
+   int send_data_to_stdout;             /// When streaming video, re-send the video feed to stdout 
 };
 
 
@@ -308,7 +309,8 @@ enum
    CommandRawFormat,
    CommandNetListen,
    CommandSPSTimings,
-   CommandSlices
+   CommandSlices,
+   CommandSendStdout
 };
 
 static COMMAND_LIST cmdline_commands[] =
@@ -342,6 +344,7 @@ static COMMAND_LIST cmdline_commands[] =
    { CommandNetListen,     "-listen",     "l", "Listen on a TCP socket", 0},
    { CommandSPSTimings,    "-spstimings",    "stm", "Add in h.264 sps timings", 0},
    { CommandSlices   ,     "-slices",     "sl", "Horizontal slices per frame. Default 1 (off)", 1},
+   { CommandSendStdout,    "-stdout",       "send", "With streaming enabled, send the h264 video feed to stdout", 0}, 
 };
 
 static int cmdline_commands_size = sizeof(cmdline_commands) / sizeof(cmdline_commands[0]);
@@ -413,6 +416,7 @@ static void default_status(RASPIVID_STATE *state)
    state->netListen = false;
    state->addSPSTiming = MMAL_FALSE;
    state->slices = 1;
+   state->send_data_to_stdout = 0;
 
 
    // Setup preview window defaults
@@ -924,6 +928,14 @@ static int parse_cmdline(int argc, const char **argv, RASPIVID_STATE *state)
          break;
       }
 
+
+      case CommandSendStdout:
+      {
+	 state->send_data_to_stdout = 1;
+
+	 break;
+      }
+
       default:
       {
          // Try parsing for any image specific parameters
@@ -1395,6 +1407,11 @@ static void encoder_buffer_callback(MMAL_PORT_T *port, MMAL_BUFFER_HEADER_T *buf
                   fprintf(pData->pts_file_handle, "%lld.%03lld\n", pts/1000, pts%1000);
                   pData->pstate->frame++;
                }
+	      
+	       if(pData->pstate->send_data_to_stdout)
+	       {
+		  fwrite(buffer->data, 1, buffer->length, stdout);
+	       }
             }
 
             mmal_buffer_header_mem_unlock(buffer);
